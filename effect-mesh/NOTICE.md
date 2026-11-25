@@ -1,6 +1,6 @@
 # 来源与授权 / Attribution
 
-本目录（`effect-mesh/`）为第三方开源项目的**构建产物**，原样集成到 Game-Art-Tools 工具箱中，未修改功能代码。
+本目录（`effect-mesh/`）为第三方开源项目的**构建产物**，集成到 Game-Art-Tools 工具箱中。
 
 - 项目：Effect Mesh Generator
 - 作者：big615big615
@@ -10,9 +10,15 @@
 
 ## 改动说明
 
-仅一处改动：构建时把 Vite `base` 设为 `/Game-Art-Tools/effect-mesh/`，并将产出 `index.html` 中的 `canonical` / `og:url` 指向本工具箱地址，以便在本仓库子路径下正确加载资源。功能与界面保持原样。
+功能逻辑与交互未改动，共三处调整：
 
-如需上游最新版本，重新构建后覆盖本目录即可：
+1. 构建时把 Vite `base` 设为 `/Game-Art-Tools/effect-mesh/`，并将产出 `index.html` 的 `canonical` / `og:url` 指向本工具箱地址，以便在本仓库子路径下正确加载资源。
+2. **界面语言本地化**：把原「日本語」语言包替换为简体中文语言包（`Language` 类型由 `'ja' | 'en'` 改为 `'zh' | 'en'`，`i18n.ts` 的 `ja` 字典译为 `zh`，网格类型名称同步翻译），默认语言改为中文。
+3. `index.html` 的 `lang`、`title`、`description`、OG/Twitter 卡片文案改为中文。
+
+**English 语言包原样保留**，界面右上角「语言」仍可在「中文 / English」之间切换。
+
+如需上游最新版本，重新构建后覆盖本目录即可（注意上游只有日/英语言包，覆盖会丢失中文）：
 
 ```bash
 git clone https://github.com/big615big615/EffectMeshGenerator.git
