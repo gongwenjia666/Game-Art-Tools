@@ -16,6 +16,7 @@
 | 02 圆形法阵提取 | `magic-circle.html` | 沿法阵外圆描点拟合椭圆，展平为正视平面，自动剔除角色等遮挡物，只输出法阵本体 |
 | 03 精灵图生成 | `sprite-generator/index.html` | 视频逐帧提取为图片序列，按帧率 / 数量 / 时间间隔抽帧，合并为精灵序列图并打包下载 |
 | 04 一键遮罩 | `mask-tool.html` | 图片转黑白遮罩图或 Sobel 边缘图，支持 Alpha 通道来源、羽化、扩图画布，可输出到 Alpha 通道 |
+| 05 特效网格生成 | `effect-mesh/index.html` | 刀光 / 飘带 / 环形 / 球面 / 光束等特效网格，实时 3D 预览、UV 预览与旋转滚动、纹理预览，支持 OBJ / FBX 导出（第三方 MIT 项目，见 `effect-mesh/NOTICE.md`） |
 | 像素化 | `pixelate.html` | 像素化 / 马赛克处理（首页暂未挂入口，可直接访问） |
 
 ## 目录结构
@@ -32,6 +33,11 @@
 │   ├── app.js
 │   ├── style.css
 │   └── vendor/jszip.min.js # 浏览器端打包下载
+├── effect-mesh/            # 特效网格生成（Effect Mesh Generator 构建产物，MIT）
+│   ├── index.html
+│   ├── assets/
+│   ├── LICENSE
+│   └── NOTICE.md           # 来源与改动说明
 ├── tests/                  # 精度测试脚本
 └── _dev/                   # 开发期调试脚本与中间产物，非工具本体
 ```
