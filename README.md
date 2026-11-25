@@ -17,6 +17,7 @@
 | 03 精灵图生成 | `sprite-generator/index.html` | 视频逐帧提取为图片序列，按帧率 / 数量 / 时间间隔抽帧，合并为精灵序列图并打包下载 |
 | 04 一键遮罩 | `mask-tool.html` | 图片转黑白遮罩图或 Sobel 边缘图，支持 Alpha 通道来源、羽化、扩图画布，可输出到 Alpha 通道 |
 | 05 特效网格生成 | `effect-mesh/index.html` | 刀光 / 飘带 / 环形 / 球面 / 光束等特效网格，实时 3D 预览、UV 预览与旋转滚动、纹理预览，支持 OBJ / FBX 导出（第三方 MIT 项目，见 `effect-mesh/NOTICE.md`） |
+| 06 Spine JSON 降级 | `spine-json-downgrade/index.html` | 读 4.3 导出的 Spine JSON，拆回 4.2 兼容 schema（统一 constraints → ik/transform/path、皮肤约束引用归位、drawOrder 首帧补 time=0），输出结构变化与丢失项报告 |
 | 像素化 | `pixelate.html` | 像素化 / 马赛克处理（首页暂未挂入口，可直接访问） |
 
 ## 目录结构
@@ -33,6 +34,9 @@
 │   ├── app.js
 │   ├── style.css
 │   └── vendor/jszip.min.js # 浏览器端打包下载
+├── spine-json-downgrade/   # Spine JSON 4.3 → 4.2 降级
+│   ├── index.html
+│   └── converter.js        # 转换逻辑（对齐桌面版 4.2 中间层处理，纯函数、可单测）
 ├── effect-mesh/            # 特效网格生成（Effect Mesh Generator 构建产物，MIT）
 │   ├── index.html
 │   ├── assets/
@@ -41,6 +45,14 @@
 ├── tests/                  # 精度测试脚本
 └── _dev/                   # 开发期调试脚本与中间产物，非工具本体
 ```
+
+### 06 Spine JSON 降级说明
+
+- 输入：Spine 4.3 导出的 JSON（`skeleton.spine = 4.3`），也接受更早版本做通用整理
+- 输出：4.2 兼容 JSON（`skeleton.spine = 4.2.11`），可直接被 4.2 运行时读取，或交给桌面版 `SpineSkeletonDataConverter` 继续降到 3.7 / 3.8
+- 已覆盖：4.3 统一 `constraints` 数组按类型拆回 `ik` / `transform` / `path`；变换、路径的混合字段按 `properties` 默认 100% 规则还原；皮肤里的约束引用按名字归位；`drawOrder` 首帧补 `time=0`；递归清除 `null`
+- 明确不做：物理约束（4.3 结构无法映射）、`slider`、`inherit` 时间轴、裁剪附件 `convex/inverse` 等 4.3 独有内容——这些会在报告里逐项列出，不会静默丢弃
+- 转换逻辑与桌面工具 `Spine43BatchConverter` 的 4.2 中间层逐函数对齐，并用 100 组随机生成的 4.3 JSON 与其 Python 实现做过逐字段对拍（结果完全一致）
 
 ## 本地运行
 
