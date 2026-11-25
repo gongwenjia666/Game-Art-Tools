@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>黑白遮罩 & 边缘检测工具</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #111318;
+    --panel: #1a1d24;
+    --panel2: #22262f;
+    --line: #2e3340;
+    --ink: #e8e6e3;
+    --ink-soft: #9aa0ad;
+    --ink-mute: #6c7280;
+    --card: #1a1d24;
+    --amber: #ff7a3c;
+    --amber-soft: rgba(255,122,60,.12);
+    --amber-line: rgba(255,122,60,.35);
+    --dark: #111318;
+    --dark-2: #1a1d24;
+  }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  header h1 { font-size: 18px; font-weight: 700; color: var(--ink); letter-spacing: .5px; }
+  header p { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  header .tag {
+    margin-left: auto;
+    background: var(--amber-soft);
+    color: var(--amber);
+    border: 1px solid var(--amber-line);
+    font-size: 11.5px; font-weight: 600;
+    padding: 6px 12px; border-radius: 999px;
+    letter-spacing: .3px;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 900px) { .container { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.25);
+  }
+  .panel h2 {
+    font-size: 13px; font-weight: 700; margin-bottom: 14px;
+    color: var(--ink); display: flex; align-items: center; gap: 8px;
+    text-transform: uppercase; letter-spacing: .8px;
+  }
+  .panel h2 .dot {
+    width: 8px; height: 8px; border-radius: 3px;
+    background: var(--amber); display: inline-block;
+  }
+
+  .dropzone {
+    border: 2px dashed #3a4150;
+    border-radius: 14px;
+    padding: 36px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .18s;
+    color: var(--ink-mute);
+    background: var(--panel2);
+  }
+  .dropzone:hover, .dropzone.drag {
+    border-color: var(--amber);
+    background: var(--amber-soft);
+    color: var(--ink);
+  }
+  .dropzone p { font-size: 13px; font-weight: 500; }
+  .dropzone small { font-size: 11.5px; color: var(--ink-mute); display: block; margin-top: 4px; }
+
+  .mode-tabs {
+    display: flex;
+    gap: 8px;
+    margin: 18px 0 6px;
+  }
+  .mode-tab {
+    flex: 1;
+    padding: 11px 6px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card);
+    font-size: 13px; font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: all .15s;
+    color: var(--ink-soft);
+  }
+  .mode-tab.active {
+    border-color: var(--amber);
+    background: var(--amber);
+    color: #fff;
+  }
+
+  .ctrl { margin-top: 16px; }
+  .ctrl label {
+    display: flex; justify-content: space-between;
+    font-size: 12.5px; color: var(--ink-soft); margin-bottom: 7px;
+    font-weight: 500;
+  }
+  .ctrl label b { color: var(--dark); font-weight: 700; }
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--amber);
+    cursor: pointer;
+    height: 4px;
+  }
+  .toggle-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 14px; font-size: 13px; color: var(--ink-soft);
+    cursor: pointer; user-select: none;
+  }
+  .toggle-row input { accent-color: var(--amber); width: 15px; height: 15px; cursor: pointer; }
+
+  .size-row { display: flex; align-items: center; gap: 8px; }
+  .size-row input[type="number"] {
+    flex: 1; min-width: 0; padding: 9px 10px;
+    border: 1px solid var(--line); border-radius: 9px;
+    font-size: 13px; color: var(--ink); background: var(--panel2);
+    font-variant-numeric: tabular-nums;
+  }
+  .size-row input[type="number"]:focus {
+    outline: none; border-color: var(--ink);
+    background: var(--amber-soft);
+  }
+  .size-row .x { color: var(--ink-mute); font-size: 13px; }
+  .size-row .unit { color: var(--ink-mute); font-size: 12px; }
+  .size-actions {
+    display: flex; align-items: center;
+    justify-content: space-between; margin-top: 6px;
+  }
+  .size-hint { font-size: 11.5px; color: var(--ink-mute); }
+  .link-btn {
+    background: none; border: none; padding: 0;
+    color: var(--ink-soft); font-size: 12px;
+    cursor: pointer; text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .link-btn:hover { color: var(--ink); }
+
+  .fill-row { display: flex; gap: 8px; }
+  .fill-btn {
+    flex: 1; padding: 9px; border: 1px solid var(--line); border-radius: 9px;
+    background: var(--card); font-size: 12.5px; font-weight: 700;
+    color: var(--ink-soft); cursor: pointer; transition: all .15s;
+  }
+  .fill-btn.active { border-color: var(--amber); background: var(--amber); color: #fff; }
+
+  .btn {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 11px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .15s;
+    margin-top: 16px;
+    letter-spacing: .3px;
+  }
+  .btn-primary {
+    background: var(--amber);
+    color: #fff;
+  }
+  .btn-primary:hover { background: #ff8f5c; transform: translateY(-1px); }
+  .btn-primary:disabled { background: #2e3340; color: #6c7280; cursor: not-allowed; transform: none; }
+  .btn-ghost {
+    background: transparent; color: var(--ink);
+    border: 1.5px solid var(--ink-soft);
+  }
+  .btn-ghost:hover { background: var(--panel2); color: var(--amber); border-color: var(--amber); }
+  .btn-ghost:disabled { border-color: var(--line); color: var(--ink-mute); cursor: not-allowed; }
+
+  .stage {
+    min-height: 520px;
+    display: flex;
+    flex-direction: column;
+  }
+  .canvas-wrap {
+    flex: 1;
+    background:
+      repeating-conic-gradient(#1e222b 0% 25%, #171a21 0% 50%) 0 0 / 22px 22px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    min-height: 420px;
+  }
+  .canvas-wrap canvas {
+    max-width: 100%;
+    max-height: 100%;
+    display: none;
+    box-shadow: 0 6px 28px rgba(0,0,0,.4);
+    border-radius: 4px;
+  }
+  .placeholder {
+    text-align: center; color: var(--ink-mute); font-size: 13px;
+  }
+
+  .toolbar {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+    align-items: center;
+  }
+  .view-switch {
+    display: flex;
+    border: 1.5px solid var(--line);
+    border-radius: 9px;
+    overflow: hidden;
+  }
+  .view-switch button {
+    border: none; background: var(--panel); padding: 8px 16px;
+    font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--ink-soft);
+    transition: all .15s;
+  }
+  .view-switch button.active { background: var(--amber); color: #fff; }
+  .toolbar .info {
+    margin-left: auto;
+    font-size: 12px; color: var(--ink-mute);
+    font-variant-numeric: tabular-nums;
+  }
+  .toast {
+    position: fixed; bottom: 26px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--panel2); color: var(--amber);
+    padding: 11px 22px; border-radius: 11px;
+    font-size: 13px; font-weight: 600; opacity: 0;
+    transition: all .3s; pointer-events: none;
+    z-index: 99;
+    box-shadow: 0 8px 30px rgba(0,0,0,.4);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>黑白遮罩 & 边缘检测工具</h1>
+    <p>图片转黑白遮罩图 / Sobel 边缘查找 · 纯本地处理，图片不上传</p>
+  </div>
+  <span class="tag">LOCAL · 离线处理</span>
+</header>
+
+<div class="container">
+  <!-- 左侧控制面板 -->
+  <div class="panel">
+    <h2><span class="dot"></span>上传图片</h2>
+    <div class="dropzone" id="dropzone">
+      <p>点击选择 或 拖拽图片到此处</p>
+      <small>支持 PNG / JPG / WEBP / BMP</small>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" hidden>
+
+    <h2 style="margin-top:22px;"><span class="dot"></span>扩图（画布尺寸）</h2>
+    <div class="size-row">
+      <input type="number" id="outW" min="1" max="8000" placeholder="宽">
+      <span class="x">×</span>
+      <input type="number" id="outH" min="1" max="8000" placeholder="高">
+      <span class="unit">px</span>
+    </div>
+    <div class="size-actions">
+      <span class="size-hint">图片保持原尺寸居中</span>
+      <button class="link-btn" id="resetSize">跟随原图</button>
+    </div>
+    <div class="ctrl">
+      <label>底图填充色 <b id="fillName">黑色</b></label>
+      <div class="fill-row">
+        <button class="fill-btn active" data-fill="#000000" type="button">黑</button>
+        <button class="fill-btn" data-fill="#ffffff" type="button">白</button>
+      </div>
+    </div>
+
+    <div id="channelSrcSection">
+    <h2 style="margin-top:22px;"><span class="dot"></span>通道来源</h2>
+    <div class="mode-tabs">
+      <div class="mode-tab ch-src active" data-src="lum">亮度</div>
+      <div class="mode-tab ch-src" data-src="alpha">Alpha通道</div>
+      <div class="mode-tab ch-src" data-src="both">亮度×Alpha</div>
+    </div>
+    <span class="size-hint" id="alphaInfo" style="display:block;margin-top:6px;"></span>
+    </div>
+
+    <h2 style="margin-top:22px;"><span class="dot"></span>处理模式</h2>
+    <div class="mode-tabs">
+      <div class="mode-tab active" data-mode="mask">黑白遮罩</div>
+      <div class="mode-tab" data-mode="edge">查找边缘</div>
+      <div class="mode-tab" data-mode="none">无变化</div>
+    </div>
+
+    <!-- 遮罩参数 -->
+    <div id="maskCtrls">
+      <div class="ctrl">
+        <label>二值化阈值 <b id="threshVal">128</b></label>
+        <input type="range" id="threshold" min="1" max="254" value="128">
+      </div>
+      <div class="ctrl">
+        <label>预平滑（去锯齿） <b id="maskBlurVal">2</b> px</label>
+        <input type="range" id="maskBlur" min="0" max="6" step="0.5" value="2">
+      </div>
+      <div class="ctrl">
+        <label>羽化半径 <b id="featherVal">0</b> px</label>
+        <input type="range" id="feather" min="0" max="60" step="1" value="0">
+      </div>
+      <label class="toggle-row"><input type="checkbox" id="invert"> 反转遮罩（黑↔白互换）</label>
+    </div>
+
+    <!-- 边缘参数 -->
+    <div id="edgeCtrls" style="display:none;">
+      <div class="ctrl">
+        <label>边缘强度 <b id="strengthVal">1.0</b></label>
+        <input type="range" id="strength" min="0.2" max="3" step="0.1" value="1">
+      </div>
+      <div class="ctrl">
+        <label>检测阈值 <b id="edgeThVal">40</b></label>
+        <input type="range" id="edgeTh" min="1" max="200" value="40">
+      </div>
+      <label class="toggle-row"><input type="checkbox" id="edgeInvert"> 反转（黑底白边）</label>
+      <div class="ctrl">
+        <label>预平滑（去噪点） <b id="edgeBlurVal">1</b> px</label>
+        <input type="range" id="edgeBlur" min="0" max="6" step="0.5" value="1">
+      </div>
+      <div class="ctrl">
+        <label>边缘柔化宽度 <b id="edgeSoftVal">6</b></label>
+        <input type="range" id="edgeSoft" min="0" max="60" value="6">
+      </div>
+      <label class="toggle-row"><input type="checkbox" id="edgeDiag" checked> 含对角方向（45°/135°）</label>
+    </div>
+
+    <h2 style="margin-top:22px;"><span class="dot"></span>输出设置</h2>
+    <label class="toggle-row"><input type="checkbox" id="outAlpha"> 输出到Alpha通道（遮罩结果写入Alpha通道）</label>
+
+    <button class="btn btn-primary" id="processBtn" disabled>生成结果</button>
+    <button class="btn btn-ghost" id="downloadBtn" disabled>下载结果图片</button>
+  </div>
+
+  <!-- 右侧预览 -->
+  <div class="panel stage">
+    <h2><span class="dot"></span>预览</h2>
+    <div class="canvas-wrap" id="canvasWrap">
+      <div class="placeholder" id="placeholder">
+        上传图片后此处显示处理结果
+      </div>
+      <canvas id="sourceCanvas"></canvas>
+      <canvas id="resultCanvas"></canvas>
+    </div>
+    <div class="toolbar">
+      <div class="view-switch">
+        <button class="active" data-view="result">结果</button>
+        <button data-view="source">原图</button>
+      </div>
+      <span class="info" id="imgInfo"></span>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const dropzone = $('dropzone'), fileInput = $('fileInput');
+const sourceCanvas = $('sourceCanvas'), resultCanvas = $('resultCanvas');
+const sctx = sourceCanvas.getContext('2d'), rctx = resultCanvas.getContext('2d');
+const processBtn = $('processBtn'), downloadBtn = $('downloadBtn');
+let img = null, mode = 'mask', currentView = 'result';
+let fillColor = '#000000';
+let channelSrc = 'lum', hasAlpha = false;
+
+/* ---------- 文件载入 ---------- */
+dropzone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+['dragover','dragenter'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('drag'); }));
+['dragleave','drop'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('drag'); }));
+dropzone.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f && f.type.startsWith('image/')) loadFile(f); else showToast('请拖入图片文件'); });
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const image = new Image();
+    image.onload = () => {
+      img = image;
+      sourceCanvas.width = resultCanvas.width = image.width;
+      sourceCanvas.height = resultCanvas.height = image.height;
+      sctx.drawImage(image, 0, 0);
+      // 检测 Alpha 通道
+      const probe = sctx.getImageData(0, 0, image.width, image.height);
+      hasAlpha = false;
+      for (let i = 3; i < probe.data.length; i += 4) {
+        if (probe.data[i] < 255) { hasAlpha = true; break; }
+      }
+      $('alphaInfo').textContent = hasAlpha ? '✓ 检测到Alpha通道' : '未检测到Alpha通道';
+      $('alphaInfo').style.color = hasAlpha ? 'var(--amber)' : 'var(--ink-mute)';
+      $('alphaInfo').style.fontWeight = hasAlpha ? '600' : '400';
+      $('placeholder').style.display = 'none';
+      processBtn.disabled = false;
+      downloadBtn.disabled = true;
+      $('outW').value = image.width;
+      $('outH').value = image.height;
+      $('imgInfo').textContent = `${image.width} × ${image.height} · ${(file.size/1024).toFixed(1)} KB`;
+      setView('source');
+      process();
+      showToast('图片已载入');
+    };
+    image.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ---------- 模式切换 ---------- */
+document.querySelectorAll('.mode-tab[data-mode]').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.mode-tab[data-mode]').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    mode = tab.dataset.mode;
+    $('maskCtrls').style.display = mode === 'mask' ? '' : 'none';
+    $('edgeCtrls').style.display = mode === 'edge' ? '' : 'none';
+    $('channelSrcSection').style.display = mode === 'none' ? 'none' : '';
+    if (img) process();
+  });
+});
+
+/* ---------- 通道来源 ---------- */
+document.querySelectorAll('.ch-src').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.ch-src').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    channelSrc = tab.dataset.src;
+    if (img) process();
+  });
+});
+
+/* ---------- 输出Alpha ---------- */
+$('outAlpha').addEventListener('change', () => img && process());
+
+/* ---------- 参数联动 ---------- */
+$('threshold').addEventListener('input', e => { $('threshVal').textContent = e.target.value; if (img) process(); });
+$('maskBlur').addEventListener('input', e => { $('maskBlurVal').textContent = e.target.value; if (img) process(); });
+$('feather').addEventListener('input', e => { $('featherVal').textContent = e.target.value; if (img) process(); });
+$('invert').addEventListener('change', () => img && process());
+$('strength').addEventListener('input', e => { $('strengthVal').textContent = Number(e.target.value).toFixed(1); if (img) process(); });
+$('edgeTh').addEventListener('input', e => { $('edgeThVal').textContent = e.target.value; if (img) process(); });
+$('edgeBlur').addEventListener('input', e => { $('edgeBlurVal').textContent = e.target.value; if (img) process(); });
+$('edgeSoft').addEventListener('input', e => { $('edgeSoftVal').textContent = e.target.value; if (img) process(); });
+$('edgeInvert').addEventListener('change', () => img && process());
+$('edgeDiag').addEventListener('change', () => img && process());
+
+/* ---------- 扩图画布尺寸 ---------- */
+function clampSize(v, fallback) {
+  v = Math.round(Number(v));
+  if (!isFinite(v) || v < 1) return fallback;
+  return Math.min(8000, v);
+}
+$('outW').addEventListener('input', () => { if (img) process(); });
+$('outH').addEventListener('input', () => { if (img) process(); });
+$('resetSize').addEventListener('click', () => {
+  if (!img) return;
+  $('outW').value = img.width;
+  $('outH').value = img.height;
+  process();
+  showToast('已恢复原图尺寸');
+});
+
+/* ---------- 底图填充色 ---------- */
+document.querySelectorAll('.fill-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.fill-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    fillColor = btn.dataset.fill;
+    $('fillName').textContent = fillColor === '#000000' ? '黑色' : '白色';
+    if (img) process();
+  });
+});
+
+/* ---------- 高斯模糊（可分离实现） ---------- */
+function gaussianBlur(src, w, h, radius) {
+  if (radius <= 0) return src;
+  const sigma = Math.max(0.6, radius / 2);
+  const size = Math.ceil(radius * 3) * 2 + 1;
+  const half = (size - 1) / 2;
+  const kernel = new Float32Array(size);
+  let sum = 0;
+  for (let i = 0; i < size; i++) {
+    const x = i - half;
+    kernel[i] = Math.exp(-(x * x) / (2 * sigma * sigma));
+    sum += kernel[i];
+  }
+  for (let i = 0; i < size; i++) kernel[i] /= sum;
+
+  const tmp = new Float32Array(w * h);
+  const dst = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let acc = 0;
+      for (let i = 0; i < size; i++) {
+        let sx = x + i - half;
+        sx = Math.max(0, Math.min(w - 1, sx));
+        acc += src[y * w + sx] * kernel[i];
+      }
+      tmp[y * w + x] = acc;
+    }
+  }
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let acc = 0;
+      for (let i = 0; i < size; i++) {
+        let sy = y + i - half;
+        sy = Math.max(0, Math.min(h - 1, sy));
+        acc += tmp[sy * w + x] * kernel[i];
+      }
+      dst[y * w + x] = acc;
+    }
+  }
+  return dst;
+}
+
+/* ---------- 盒式模糊（3 次近似高斯，大半径羽化也流畅） ---------- */
+function boxBlurOnce(src, w, h, r) {
+  const tmp = new Float32Array(w * h);
+  const dst = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    let acc = 0;
+    const row = y * w;
+    for (let x = -r; x <= r; x++) acc += src[row + Math.max(0, Math.min(w - 1, x))];
+    for (let x = 0; x < w; x++) {
+      tmp[row + x] = acc / (2 * r + 1);
+      const addX = Math.min(w - 1, x + r + 1), subX = Math.max(0, x - r);
+      acc += src[row + addX] - src[row + subX];
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let acc = 0;
+    for (let y = -r; y <= r; y++) acc += tmp[Math.max(0, Math.min(h - 1, y)) * w + x];
+    for (let y = 0; y < h; y++) {
+      dst[y * w + x] = acc / (2 * r + 1);
+      const addY = Math.min(h - 1, y + r + 1), subY = Math.max(0, y - r);
+      acc += tmp[addY * w + x] - tmp[subY * w + x];
+    }
+  }
+  return dst;
+}
+function approximateGaussian(src, w, h, radius) {
+  if (radius <= 0) return src;
+  const r = Math.max(1, Math.round(radius));
+  let out = src;
+  for (let i = 0; i < 3; i++) out = boxBlurOnce(out, w, h, r);
+  return out;
+}
+
+/* ---------- 核心处理 ---------- */
+processBtn.addEventListener('click', process);
+
+function process() {
+  if (!img) return;
+  // 自定义输出尺寸（无效输入回退原图尺寸）
+  const w = clampSize($('outW').value, img.width);
+  const h = clampSize($('outH').value, img.height);
+  sourceCanvas.width = resultCanvas.width = w;
+  sourceCanvas.height = resultCanvas.height = h;
+  // 第一步：扩图 —— 先在透明画布上绘制原图（保留 Alpha），再填充底色重绘
+  const offX = Math.round((w - img.width) / 2);
+  const offY = Math.round((h - img.height) / 2);
+  // Clean draw (transparent bg) to capture original alpha
+  sctx.clearRect(0, 0, w, h);
+  sctx.drawImage(img, offX, offY);
+  const cleanData = sctx.getImageData(0, 0, w, h);
+  // Fill + draw for display & "none" mode
+  sctx.fillStyle = fillColor;
+  sctx.fillRect(0, 0, w, h);
+  sctx.drawImage(img, offX, offY);
+  const src = sctx.getImageData(0, 0, w, h);
+  // Compute grayscale based on channel source
+  const gray = new Float32Array(w * h);
+  for (let i = 0, p = 0; i < src.data.length; i += 4, p++) {
+    const lum = 0.299 * src.data[i] + 0.587 * src.data[i+1] + 0.114 * src.data[i+2];
+    const a = cleanData.data[i+3] / 255;
+    if (channelSrc === 'alpha') {
+      gray[p] = a * 255;
+    } else if (channelSrc === 'both') {
+      gray[p] = lum * a;
+    } else {
+      gray[p] = lum;
+    }
+  }
+  if (w !== img.width || h !== img.height) {
+    $('imgInfo').textContent = `输出 ${w} × ${h} · 原图 ${img.width} × ${img.height}`;
+  }
+
+  const out = rctx.createImageData(w, h);
+  const outData = out.data;
+
+  const useAlpha = $('outAlpha').checked;
+
+  if (mode === 'none') {
+    outData.set(src.data);
+    if (useAlpha) {
+      // 将原始 Alpha 通道写入输出
+      for (let p = 0; p < w * h; p++) outData[p*4+3] = cleanData.data[p*4+3];
+    }
+  } else if (mode === 'mask') {
+    const th = +$('threshold').value;
+    const inv = $('invert').checked;
+    const feather = +$('feather').value;
+    const blurred = gaussianBlur(gray, w, h, +$('maskBlur').value);
+    const mask = new Float32Array(w * h);
+    for (let p = 0; p < w * h; p++) mask[p] = blurred[p] >= th ? 1 : 0;
+    const feathered = feather > 0 ? approximateGaussian(mask, w, h, feather) : mask;
+    for (let p = 0; p < w * h; p++) {
+      let v = feathered[p];
+      if (inv) v = 1 - v;
+      const c = Math.round(v * 255);
+      outData[p*4] = c; outData[p*4+1] = c; outData[p*4+2] = c; outData[p*4+3] = useAlpha ? c : 255;
+    }
+  } else {
+    const k = +$('strength').value;
+    const th = +$('edgeTh').value;
+    const inv = $('edgeInvert').checked;
+    const diag = $('edgeDiag').checked;
+    const soft = +$('edgeSoft').value;
+    const g2 = gaussianBlur(gray, w, h, +$('edgeBlur').value);
+    const gxK = [[-1,0,1],[-2,0,2],[-1,0,1]];
+    const gyK = [[-1,-2,-1],[0,0,0],[1,2,1]];
+    const g45K  = [[0,1,2],[-1,0,1],[-2,-1,0]];
+    const g135K = [[-2,-1,0],[-1,0,1],[0,1,2]];
+
+    const convolve = (kernel) => {
+      let sum = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          let x = px + dx, y = py + dy;
+          x = Math.max(0, Math.min(w - 1, x));
+          y = Math.max(0, Math.min(h - 1, y));
+          sum += g2[y * w + x] * kernel[dy+1][dx+1];
+        }
+      }
+      return sum;
+    };
+
+    let px, py;
+    for (py = 0; py < h; py++) {
+      for (px = 0; px < w; px++) {
+        let gx = convolve(gxK), gy = convolve(gyK);
+        let mag = Math.sqrt(gx*gx + gy*gy);
+        if (diag) {
+          const g45 = convolve(g45K), g135 = convolve(g135K);
+          const mag2 = Math.sqrt(g45*g45 + g135*g135);
+          mag = Math.max(mag, mag2);
+        }
+        const m = mag * k;
+        let v;
+        if (soft > 0) {
+          const d = (m - th) / soft * 3;
+          v = 1 / (1 + Math.exp(-d));
+        } else {
+          v = m >= th ? 255 : 0;
+        }
+        if (inv) v = 1 - v;
+        const c = Math.round(v * 255);
+        const p = py * w + px;
+        outData[p*4] = outData[p*4+1] = outData[p*4+2] = c;
+        outData[p*4+3] = useAlpha ? c : 255;
+      }
+    }
+  }
+
+  rctx.putImageData(out, 0, 0);
+  resultCanvas.style.display = 'block';
+  downloadBtn.disabled = false;
+  setView('result');
+}
+
+/* ---------- 视图切换 ---------- */
+document.querySelectorAll('.view-switch button').forEach(btn => {
+  btn.addEventListener('click', () => setView(btn.dataset.view));
+});
+function setView(v) {
+  currentView = v;
+  document.querySelectorAll('.view-switch button').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+  sourceCanvas.style.display = v === 'source' ? 'block' : 'none';
+  resultCanvas.style.display = (v === 'result' && !downloadBtn.disabled) ? 'block' : 'none';
+}
+
+/* ---------- 下载 ---------- */
+downloadBtn.addEventListener('click', () => {
+  const name = { mask: 'mask', edge: 'edges', none: 'canvas' }[mode];
+  const suffix = $('outAlpha').checked ? '_alpha' : '';
+  const a = document.createElement('a');
+  a.download = `${name}${suffix}_${Date.now()}.png`;
+  a.href = resultCanvas.toDataURL('image/png');
+  a.click();
+  showToast('已下载 PNG');
+});
+
+function showToast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+</script>
+</body>
+</html>

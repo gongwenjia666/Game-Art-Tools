@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>贴图像素化 · 8-bit / 16-bit</title>
+<style>
+  :root{
+    --bg:#111318; --panel:#1a1d24; --panel2:#22262f; --line:#2e3340;
+    --txt:#e8e6e3; --dim:#9aa0ad; --acc:#ff7a3c; --acc2:#37d6c3;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--bg); color:var(--txt); font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif; min-height:100vh;}
+  header{padding:16px 24px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:16px;}
+  header h1{font-size:18px; font-weight:700;}
+  header .sub{color:var(--dim); font-size:12px; margin-top:2px;}
+  .back{margin-left:auto; font-size:13px; color:var(--dim); text-decoration:none; border:1px solid var(--line); padding:6px 14px; border-radius:20px; transition:.15s; white-space:nowrap;}
+  .back:hover{color:var(--acc); border-color:var(--acc);}
+  main{display:grid; grid-template-columns:302px 1fr; gap:16px; padding:16px 24px; max-width:1500px; margin:0 auto;}
+  aside{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px; height:fit-content; position:sticky; top:16px;}
+  .group{margin-bottom:18px;}
+  .group h3{font-size:13px; color:var(--acc); margin-bottom:10px; letter-spacing:1px;}
+  .row{display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; gap:8px; font-size:13px;}
+  .row label{color:var(--dim); white-space:nowrap;}
+  .row input[type=range]{flex:1; accent-color:var(--acc); min-width:0;}
+  .row .val{min-width:52px; text-align:right; font-variant-numeric:tabular-nums; font-size:12px;}
+  .btn{display:block; width:100%; border:1px solid var(--line); background:var(--panel2); color:var(--txt); padding:9px 0; border-radius:9px; cursor:pointer; font-size:13px; margin-bottom:8px; transition:.15s;}
+  .btn:hover{border-color:var(--acc); color:var(--acc);}
+  .btn.primary{background:var(--acc); border-color:var(--acc); color:#fff; font-weight:700;}
+  .btn.primary:hover{filter:brightness(1.12); color:#fff;}
+  .btn:disabled{opacity:.4; cursor:not-allowed;}
+  .seg{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;}
+  .seg button{border:1px solid var(--line); background:var(--panel2); color:var(--dim); border-radius:9px; padding:10px 6px; cursor:pointer; font-size:13px; transition:.15s; font-family:inherit;}
+  .seg button b{display:block; font-size:14px; color:var(--txt); font-weight:700;}
+  .seg button small{font-size:11px; color:#6c7280;}
+  .seg button.on{border-color:var(--acc); background:rgba(255,122,60,.12);}
+  .seg button.on small{color:var(--acc);}
+  select{background:var(--panel2); color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:12.5px; font-family:inherit; cursor:pointer; width:118px;}
+  .chk{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--dim); margin-bottom:8px; cursor:pointer;}
+  .chk input{accent-color:var(--acc);}
+  .hint{font-size:12px; color:var(--dim); line-height:1.75; background:var(--panel2); border-radius:9px; padding:10px 12px;}
+  .hint b{color:var(--acc2);}
+  #status{font-size:12px; color:var(--acc2); min-height:16px; margin-top:4px; line-height:1.6;}
+  #stage{display:grid; gap:16px; min-width:0;}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden;}
+  .card h2{font-size:14px; padding:11px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px;}
+  .card h2 .pill{font-size:11px; color:var(--dim); font-weight:400;}
+  .cbody{padding:14px 16px; display:flex; justify-content:center; align-items:center; min-height:150px; position:relative;}
+  canvas{max-width:100%; border-radius:6px;}
+  #srcCanvas{cursor:default; background:#000;}
+  #pxCanvas{image-rendering:pixelated; image-rendering:crisp-edges;}
+  #pxWrap{background:repeating-conic-gradient(#1e222b 0% 25%, #171a21 0% 50%) 0 0/22px 22px; border-radius:6px; display:flex; justify-content:center;}
+  #drop{position:absolute; inset:0; border:2px dashed var(--line); border-radius:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--dim); cursor:pointer; transition:.2s; background:rgba(17,19,24,.85); z-index:5;}
+  #drop:hover,#drop.over{border-color:var(--acc); color:var(--acc);}
+  .empty-tips{font-size:13px;} .empty-sub{font-size:12px; color:#6c7280;}
+  footer{max-width:1500px; margin:0 auto; padding:6px 24px 26px; color:#6c7280; font-size:12px; line-height:1.8;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>贴图像素化</h1>
+    <div class="sub">真实色深限制 · 8-bit RGB332 / 16-bit RGB555 · 有序抖动 · 二值透明</div>
+  </div>
+  <a class="back" href="index.html">返回首页</a>
+</header>
+
+<main>
+  <aside>
+    <div class="group">
+      <h3>1. 载入图片</h3>
+      <button class="btn" id="btnPick">选择图片</button>
+      <div id="status">拖入图片 / Ctrl+V 粘贴，或点击上方按钮。</div>
+    </div>
+
+    <div class="group">
+      <h3>2. 风格</h3>
+      <div class="seg">
+        <button id="m8" class="on"><b>8-bit</b><small>RGB332 · 256 色</small></button>
+        <button id="m16"><b>16-bit</b><small>RGB555 · 32768 色</small></button>
+      </div>
+      <div class="row" id="rowColors" style="display:none">
+        <label>限定色数</label>
+        <select id="pColors">
+          <option value="0">不限（RGB555）</option>
+          <option value="256">256 色</option>
+          <option value="64">64 色</option>
+          <option value="32">32 色</option>
+          <option value="16">16 色</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>3. 采样与色深</h3>
+      <div class="row"><label>输出宽度</label><input type="range" id="pOutW" min="24" max="320" step="2" value="128"><span class="val" id="vOutW">128</span></div>
+      <div class="row"><label>采样方式</label>
+        <select id="pSample">
+          <option value="dom">主色（保边锐利）</option>
+          <option value="mean">平均（平滑过渡）</option>
+        </select>
+      </div>
+      <div class="row"><label>抖动强度</label><input type="range" id="pDither" min="0" max="100" value="70"><span class="val" id="vDither">70</span></div>
+      <div class="row"><label>色彩增强</label><input type="range" id="pBoost" min="0" max="100" value="30"><span class="val" id="vBoost">30</span></div>
+      <div class="row"><label>透明阈值</label><input type="range" id="pAlpha" min="0" max="100" value="50"><span class="val" id="vAlpha">50%</span></div>
+    </div>
+
+    <div class="group">
+      <h3>4. 导出</h3>
+      <div class="row"><label>导出倍数</label>
+        <select id="pScale">
+          <option value="1">×1（引擎用）</option>
+          <option value="2">×2</option>
+          <option value="4">×4</option>
+          <option value="8">×8</option>
+        </select>
+      </div>
+      <button class="btn primary" id="btnSave" disabled>下载像素 PNG</button>
+    </div>
+
+    <div class="hint">
+      8-bit：<b>RGB332</b>（红绿各 8 级、蓝 4 级），靠 Bayer 抖动补出渐变；<br>
+      16-bit：<b>RGB555</b>（每通道 32 级），可再限色 16~256 色，接近 SNES 贴图观感；<br>
+      采样选<b>主色</b>可避免块内平均导致的糊边；透明贴图走二值 alpha，不会留半透明毛边。
+    </div>
+  </aside>
+
+  <section id="stage">
+    <div class="card">
+      <h2>原图 <span class="pill" id="srcInfo"></span></h2>
+      <div class="cbody">
+        <canvas id="srcCanvas" width="10" height="10"></canvas>
+        <div id="drop">
+          <div class="empty-tips">点击上传，或把贴图拖到这里（支持 Ctrl+V 粘贴）</div>
+          <div class="empty-sub">含透明通道的 PNG 也支持</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>像素化结果 <span class="pill" id="outInfo"></span></h2>
+      <div class="cbody"><div id="pxWrap"><canvas id="pxCanvas" width="10" height="10"></canvas></div></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  流程：分块采样（主色 / 均值）→ 按块二值化 alpha → 色彩增强 → Bayer 4×4 有序抖动 → 色深量化（RGB332 / RGB555 / 中位切分调色板）→ 最近邻放大预览。<br>
+  纯前端本地运行，图片不会上传到任何服务器。
+</footer>
+
+<input type="file" id="fileInput" accept="image/*" style="display:none">
+
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const srcCanvas=$("srcCanvas"), srcCtx=srcCanvas.getContext("2d");
+const pxCanvas=$("pxCanvas"), pxCtx=pxCanvas.getContext("2d");
+
+let img=null, imgW=0, imgH=0, imgData=null;
+let smallCanvas=null;
+let style="bit8";
+let renderTimer=null;
+
+/* ==================== PURE START ==================== */
+const BAYER=new Float32Array([0,8,2,10, 12,4,14,6, 3,11,1,9, 15,7,13,5]);
+function bayer(x,y){ return BAYER[(y&3)*4+(x&3)]/16; }     // 0 ~ 0.9375
+
+function quantStep(v, step){
+  v=v<0?0:v>255?255:v;
+  return Math.round(v/step)*step;
+}
+
+/* 分块采样：返回 RGB(A) 数组与不透明像素色列表 */
+function sampleBlocks(d,w,h,outW,outH,mode,alphaThr){
+  const sx=w/outW, sy=h/outH;
+  const px=new Float32Array(outW*outH*4);
+  const list=[];
+  const buckets=new Map();
+  for(let by=0;by<outH;by++){
+    for(let bx=0;bx<outW;bx++){
+      const x0=Math.floor(bx*sx);
+      const x1=Math.max(x0+1, Math.min(w, Math.round((bx+1)*sx)));
+      const y0=Math.floor(by*sy);
+      const y1=Math.max(y0+1, Math.min(h, Math.round((by+1)*sy)));
+      let rS=0,gS=0,bS=0,aS=0,n=0,oc=0;
+      buckets.clear();
+      for(let y=y0;y<y1;y++){
+        const ro=y*w;
+        for(let x=x0;x<x1;x++){
+          const o=(ro+x)*4;
+          const a=d[o+3];
+          aS+=a; n++;
+          if(a<8) continue;
+          const r=d[o], g=d[o+1], b=d[o+2];
+          rS+=r; gS+=g; bS+=b; oc++;
+          if(mode==="dom"){
+            const key=((r>>4)<<8)|((g>>4)<<4)|(b>>4);
+            let e=buckets.get(key);
+            if(!e){ e=[0,0,0,0]; buckets.set(key,e); }
+            e[0]+=r; e[1]+=g; e[2]+=b; e[3]+=1;
+          }
+        }
+      }
+      const i=(by*outW+bx)*4;
+      const avgA=n? aS/n : 0;
+      // 二值 alpha：整块要么全不透明要么全透明，避免像素风出现毛边
+      if(!oc || avgA<alphaThr) continue;
+      let r,g,b;
+      if(mode==="mean"){
+        r=rS/oc; g=gS/oc; b=bS/oc;          // 只对不透明像素求均值
+      }else{
+        let best=null, bw=-1;
+        for(const e of buckets.values()) if(e[3]>bw){ bw=e[3]; best=e; }
+        if(!best) continue;
+        r=best[0]/best[3]; g=best[1]/best[3]; b=best[2]/best[3];
+      }
+      px[i]=r; px[i+1]=g; px[i+2]=b; px[i+3]=255;
+      list.push([r,g,b]);
+    }
+  }
+  return {px,list};
+}
+
+/* 色彩增强：饱和度 + 对比度，让像素风更“硬” */
+function applyBoost(px,boost){
+  if(boost<=0) return;
+  const s=1+boost*0.6, c=1+boost*0.45;
+  for(let i=0;i<px.length;i+=4){
+    if(px[i+3]===0) continue;
+    let r=px[i], g=px[i+1], b=px[i+2];
+    const L=0.299*r+0.587*g+0.114*b;
+    r=L+(r-L)*s; g=L+(g-L)*s; b=L+(b-L)*s;
+    r=(r-128)*c+128; g=(g-128)*c+128; b=(b-128)*c+128;
+    px[i]=r<0?0:r>255?255:r;
+    px[i+1]=g<0?0:g>255?255:g;
+    px[i+2]=b<0?0:b>255?255:b;
+  }
+}
+
+/* 中位切分调色板 */
+function medianCut(colors, K){
+  let boxes=[colors];
+  while(boxes.length<K){
+    let bi=-1, bestScore=-1, bestCh=0;
+    for(let i=0;i<boxes.length;i++){
+      const box=boxes[i];
+      if(box.length<8) continue;
+      let rmin=255,rmax=0,gmin=255,gmax=0,bmin=255,bmax=0;
+      for(const c of box){
+        if(c[0]<rmin)rmin=c[0]; if(c[0]>rmax)rmax=c[0];
+        if(c[1]<gmin)gmin=c[1]; if(c[1]>gmax)gmax=c[1];
+        if(c[2]<bmin)bmin=c[2]; if(c[2]>bmax)bmax=c[2];
+      }
+      const rr=rmax-rmin, rg=gmax-gmin, rb=bmax-bmin;
+      const mx=Math.max(rr,rg,rb);
+      const score=mx*Math.log2(box.length+1);
+      if(score>bestScore){ bestScore=score; bi=i; bestCh=mx===rr?0:mx===rg?1:2; }
+    }
+    if(bi<0) break;
+    const box=boxes[bi];
+    box.sort((a,b)=>a[bestCh]-b[bestCh]);
+    const mid=box.length>>1;
+    boxes.splice(bi,1,box.slice(0,mid),box.slice(mid));
+  }
+  return boxes.filter(b=>b.length).map(b=>{
+    let r=0,g=0,bb=0;
+    for(const c of b){ r+=c[0]; g+=c[1]; bb+=c[2]; }
+    return [r/b.length|0, g/b.length|0, bb/b.length|0];
+  });
+}
+
+function nearestColor(pal, r, g, b){
+  let best=pal[0], bd=Infinity;
+  for(const p of pal){
+    const dr=r-p[0], dg=g-p[1], db=b-p[2];
+    const d2=dr*dr*0.30+dg*dg*0.59+db*db*0.11;   // 人眼加权
+    if(d2<bd){ bd=d2; best=p; }
+  }
+  return best;
+}
+
+/* 抖动 + 色深量化 */
+function quantizeAll(px,outW,outH,styleName,dith,K){
+  let palette=null;
+  if(K>0){
+    const list=[];
+    for(let i=0;i<px.length;i+=4) if(px[i+3]) list.push([px[i],px[i+1],px[i+2]]);
+    if(list.length>K) palette=medianCut(list,K);
+  }
+  const stepR=styleName==="bit8"?255/7:255/31;
+  const stepG=stepR;
+  const stepB=styleName==="bit8"?255/3:255/31;
+  for(let y=0;y<outH;y++)for(let x=0;x<outW;x++){
+    const i=(y*outW+x)*4;
+    if(px[i+3]===0) continue;
+    const off=(bayer(x,y)-0.46875)*dith;
+    let r=px[i], g=px[i+1], b=px[i+2];
+    if(palette){
+      const k=off*64;
+      const p=nearestColor(palette, r+k, g+k, b+k);
+      r=p[0]; g=p[1]; b=p[2];
+    }else{
+      r=quantStep(r+off*stepR, stepR);
+      g=quantStep(g+off*stepG, stepG);
+      b=quantStep(b+off*stepB, stepB);
+    }
+    px[i]=r; px[i+1]=g; px[i+2]=b;
+  }
+  return palette;
+}
+/* ==================== PURE END ==================== */
+
+/* ================= 载入 ================= */
+const drop=$("drop"), fileInput=$("fileInput");
+drop.onclick=()=>fileInput.click();
+$("btnPick").onclick=()=>fileInput.click();
+fileInput.onchange=e=>{ loadFile(e.target.files[0]); fileInput.value=""; };
+document.addEventListener("dragover",e=>{e.preventDefault(); drop.classList.add("over");});
+document.addEventListener("dragleave",e=>{ if(e.target===document.documentElement) drop.classList.remove("over");});
+document.addEventListener("drop",e=>{ e.preventDefault(); drop.classList.remove("over"); if(e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]); });
+document.addEventListener("paste",e=>{ for(const it of (e.clipboardData?.items||[])) if(it.type.startsWith("image/")) loadFile(it.getAsFile()); });
+
+function loadFile(file){
+  if(!file || !file.type.startsWith("image/")) return;
+  const r=new FileReader();
+  r.onload=e=>loadURL(e.target.result);
+  r.readAsDataURL(file);
+}
+function loadURL(url){
+  const im=new Image();
+  im.onload=()=>{
+    const MAX=2000, sc=Math.min(1, MAX/Math.max(im.width,im.height));
+    imgW=Math.round(im.width*sc); imgH=Math.round(im.height*sc);
+    img=document.createElement("canvas"); img.width=imgW; img.height=imgH;
+    const c=img.getContext("2d",{willReadFrequently:true});
+    c.drawImage(im,0,0,imgW,imgH);
+    imgData=c.getImageData(0,0,imgW,imgH);
+    srcCanvas.width=imgW; srcCanvas.height=imgH;
+    srcCtx.drawImage(img,0,0);
+    drop.style.display="none";
+    $("srcInfo").textContent=`${im.width}×${im.height}`+(sc<1?`（处理 ${imgW}×${imgH}）`:"");
+    $("btnSave").disabled=false;
+    const maxW=Math.max(24, Math.min(320, imgW));
+    const el=$("pOutW"); el.max=maxW;
+    if(+el.value>maxW) el.value=maxW;
+    $("vOutW").textContent=el.value;
+    render();
+  };
+  im.src=url;
+}
+function setStatus(s){ $("status").textContent=s; }
+
+/* ================= 主渲染 ================= */
+function render(){
+  if(!img) return;
+  let outW=Math.max(1, Math.min(imgW, +$("pOutW").value));
+  let outH=Math.max(1, Math.round(outW*imgH/imgW));
+  if(outH>1024){ const k=1024/outH; outH=1024; outW=Math.max(1, Math.round(outW*k)); }
+
+  const mode=$("pSample").value;
+  const dith=+$("pDither").value/100;
+  const boost=+$("pBoost").value/100;
+  const alphaThr=+$("pAlpha").value/100*255;
+  const K=style==="bit16" ? (+$("pColors").value||0) : 0;
+
+  const t0=performance.now();
+  const {px}=sampleBlocks(imgData.data, imgW, imgH, outW, outH, mode, alphaThr);
+  applyBoost(px, boost);
+  const palette=quantizeAll(px, outW, outH, style, dith, K);
+  const ms=Math.round(performance.now()-t0);
+
+  // 写入真实像素尺寸小图
+  if(!smallCanvas) smallCanvas=document.createElement("canvas");
+  smallCanvas.width=outW; smallCanvas.height=outH;
+  const sctx=smallCanvas.getContext("2d");
+  const out=sctx.createImageData(outW,outH), od=out.data;
+  for(let i=0;i<px.length;i+=4){
+    od[i]=px[i]; od[i+1]=px[i+1]; od[i+2]=px[i+2]; od[i+3]=px[i+3];
+  }
+  sctx.putImageData(out,0,0);
+
+  // 预览（整数倍最近邻）
+  let zoom=Math.max(1, Math.floor(760/outW));
+  if(outH*zoom>560) zoom=Math.max(1, Math.floor(560/outH));
+  const pw=outW*zoom, ph=outH*zoom;
+  pxCanvas.width=pw; pxCanvas.height=ph;
+  pxCtx.imageSmoothingEnabled=false;
+  pxCtx.clearRect(0,0,pw,ph);
+  pxCtx.drawImage(smallCanvas,0,0,pw,ph);
+
+  let colorTxt;
+  if(palette) colorTxt=`${palette.length} 色`;
+  else colorTxt=style==="bit8"?"RGB332":"RGB555";
+  const info=`${outW}×${outH} · ${style==="bit8"?"8-bit":"16-bit"} ${colorTxt} · 抖动 ${Math.round(dith*100)}% · ${ms}ms`;
+  $("outInfo").textContent=info;
+  setStatus(`已生成 — ${info}`);
+}
+
+/* ================= 风格切换 ================= */
+function setStyle(s){
+  style=s;
+  $("m8").classList.toggle("on", s==="bit8");
+  $("m16").classList.toggle("on", s==="bit16");
+  $("rowColors").style.display = s==="bit16" ? "flex" : "none";
+  $("pDither").value = s==="bit8" ? 70 : 30;
+  $("vDither").textContent = $("pDither").value;
+  schedule();
+}
+$("m8").onclick=()=>setStyle("bit8");
+$("m16").onclick=()=>setStyle("bit16");
+
+/* ================= 参数绑定 ================= */
+$("pOutW").addEventListener("input",e=>{ $("vOutW").textContent=e.target.value; });
+$("pDither").addEventListener("input",e=>{ $("vDither").textContent=e.target.value; });
+$("pBoost").addEventListener("input",e=>{ $("vBoost").textContent=e.target.value; });
+$("pAlpha").addEventListener("input",e=>{ $("vAlpha").textContent=e.target.value+"%"; });
+
+for(const id of ["pOutW","pDither","pBoost","pAlpha","pSample","pColors","pScale"]){
+  $(id).addEventListener("input", schedule);
+  $(id).addEventListener("change", schedule);
+}
+function schedule(){
+  if(!img) return;
+  if(renderTimer) cancelAnimationFrame(renderTimer);
+  renderTimer=requestAnimationFrame(()=>{ renderTimer=null; render(); });
+}
+
+/* ================= 导出 ================= */
+$("btnSave").onclick=()=>{
+  if(!smallCanvas) return;
+  const sc=+$("pScale").value;
+  let cv=smallCanvas;
+  if(sc>1){
+    cv=document.createElement("canvas");
+    cv.width=smallCanvas.width*sc; cv.height=smallCanvas.height*sc;
+    const c=cv.getContext("2d");
+    c.imageSmoothingEnabled=false;
+    c.drawImage(smallCanvas,0,0,cv.width,cv.height);
+  }
+  cv.toBlob(b=>{
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(b);
+    a.download=`texture_${style==="bit8"?"8bit":"16bit"}_${smallCanvas.width}x${smallCanvas.height}${sc>1?"_x"+sc:""}.png`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+  },"image/png");
+};
+</script>
+</body>
+</html>
